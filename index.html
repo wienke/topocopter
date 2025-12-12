@@ -607,6 +607,7 @@
         let nextSpawnTime = 0;
         let spawnInterval = 2000;
         let enemyBaseSpeed = 5;
+        let touchTarget = null;
 
         const helicopter = {
             x: gameWidth / 2,
@@ -687,10 +688,33 @@
                     provinceLayer.bringToBack();
                 })
                 .catch(err => console.error(err));
-
             const bounds = L.latLngBounds(L.latLng(50.5, 3.2), L.latLng(53.6, 7.3));
             map.setMaxBounds(bounds.pad(0.5));
             map.setView([52.2, 5.3], 9);
+
+            map.on('click', (e) => {
+                if (!isPlaying || isShooterMode) return;
+                touchTarget = e.containerPoint;
+
+                // Minimal visual feedback
+                const dot = document.createElement('div');
+                dot.style.position = 'absolute';
+                dot.style.left = (e.containerPoint.x - 5) + 'px';
+                dot.style.top = (e.containerPoint.y - 5) + 'px';
+                dot.style.width = '10px';
+                dot.style.height = '10px';
+                dot.style.background = 'rgba(255, 255, 255, 0.5)';
+                dot.style.borderRadius = '50%';
+                dot.style.pointerEvents = 'none';
+                dot.style.zIndex = '20';
+                dot.style.transition = 'opacity 0.5s, transform 0.5s';
+                document.getElementById('game-container').appendChild(dot);
+                setTimeout(() => {
+                    dot.style.opacity = '0';
+                    dot.style.transform = 'scale(2)';
+                }, 10);
+                setTimeout(() => dot.remove(), 550);
+            });
 
             map.whenReady(() => {
                 map.invalidateSize();
@@ -1101,13 +1125,36 @@
             let dx = 0;
             let dy = 0;
 
-            if (inputState.up) dy = -speed;
-            if (inputState.down) dy = speed;
-
-            if (!isShooterMode) {
-                if (inputState.left) dx = -speed;
-                if (inputState.right) dx = speed;
+            // Manual Input Check
+            if (inputState.up || inputState.down || inputState.left || inputState.right) {
+                touchTarget = null; // Cancel auto-pilot
+                if (inputState.up) dy = -speed;
+                if (inputState.down) dy = speed;
+                if (!isShooterMode) {
+                    if (inputState.left) dx = -speed;
+                    if (inputState.right) dx = speed;
+                }
             }
+            // Auto-Pilot (Touch)
+            else if (touchTarget && !isShooterMode) {
+                const dxRaw = touchTarget.x - helicopter.x;
+                const dyRaw = touchTarget.y - helicopter.y;
+                const dist = Math.hypot(dxRaw, dyRaw);
+
+                if (dist < speed) {
+                    // Arrived
+                    touchTarget = null;
+                } else {
+                    const angle = Math.atan2(dyRaw, dxRaw);
+                    dx = Math.cos(angle) * speed;
+                    dy = Math.sin(angle) * speed;
+                }
+            }
+            // Shooter mode restriction for touch? 
+            // User requested "tap on map", implied Topo mode. 
+            // Shooter mode uses D-pad or just Up/Down.
+            // If we want touch in shooter mode, we'd need to map y-axis only. 
+            // But code above cancels touchTarget if isShooterMode in update loop, so safe.
 
             // Movement & Pans
             let nextX = helicopter.x + dx;
