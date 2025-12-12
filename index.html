@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Topocopter</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #F1C40F;
+            --success-color: #2ecc71;
+            --text-color: #ecf0f1;
+            --land-color: #2c3e50;
+            --water-color: #2c3e50;
+            --error-color: #e74c3c;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a252f;
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: var(--land-color);
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background-color: #262626;
+            z-index: 1;
+            cursor: default;
+            transition: opacity 2s ease;
+        }
+
+        #map.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .leaflet-container {
+            background: #262626;
+        }
+
+        .leaflet-control-container .leaflet-top,
+        .leaflet-control-container .leaflet-bottom {
+            display: none !important;
+        }
+
+        /* UI Elements */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            display: flex;
+            gap: 20px;
+            pointer-events: none;
+            transition: opacity 1s;
+        }
+
+        .ui-box {
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ui-label {
+            color: #bdc3c7;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-right: 5px;
+        }
+
+        #target-city {
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 1.4rem;
+        }
+
+        #timer {
+            font-family: monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .timer-warning {
+            color: var(--error-color);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* Province Labels */
+        .province-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            white-space: nowrap;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        /* City Markers */
+        .city-marker-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .city {
+            width: 14px;
+            height: 14px;
+            background-color: #e74c3c;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .city.found {
+            background-color: var(--success-color);
+            box-shadow: 0 0 15px var(--success-color);
+            transform: scale(1.4);
+        }
+
+        /* Helicopter */
+        #helicopter {
+            position: absolute;
+            font-size: 96px;
+            z-index: 30;
+            transition: top 0.1s linear, left 0.1s linear, transform 0.2s;
+            user-select: none;
+            line-height: 1;
+            filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.3));
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: -50px;
+            margin-top: -50px;
+            pointer-events: none;
+        }
+
+        /* Shooter Mode Transition Override */
+        #helicopter.shooter-mode {
+            transition: top 0.1s linear, left 1s ease-in-out;
+            /* Smooth move to start pos, then snappy Y movement */
+        }
+
+        /* Rocket */
+        .rocket {
+            position: absolute;
+            font-size: 40px;
+            z-index: 25;
+            transition: transform 1s ease-in, opacity 1s ease-in;
+            pointer-events: none;
+        }
+
+        /* Enemy */
+        .enemy {
+            position: absolute;
+            font-size: 60px;
+            z-index: 28;
+            pointer-events: none;
+            filter: drop-shadow(0 0 5px red);
+        }
+
+        .explosion {
+            position: absolute;
+            font-size: 60px;
+            z-index: 29;
+            pointer-events: none;
+            animation: fadeOut 0.5s forwards;
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: scale(2);
+            }
+        }
+
+        /* Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(44, 62, 80, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            pointer-events: auto;
+        }
+
+        .overlay h1 {
+            font-size: 4rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent-color);
+            text-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .overlay p {
+            font-size: 1.5rem;
+            max-width: 700px;
+            line-height: 1.6;
+            margin-bottom: 3rem;
+            color: #bdc3c7;
+        }
+
+        /* Difficulty Buttons */
+        .difficulty-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 1.5rem;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+            min-width: 200px;
+        }
+
+        .btn-easy {
+            background-color: #27ae60;
+            box-shadow: 0 10px 0 #1e8449;
+        }
+
+        .btn-easy:hover {
+            background-color: #2ecc71;
+            box-shadow: 0 12px 0 #1e8449;
+        }
+
+        .btn-medium {
+            background-color: #f39c12;
+            box-shadow: 0 10px 0 #d35400;
+        }
+
+        .btn-medium:hover {
+            background-color: #f1c40f;
+            box-shadow: 0 12px 0 #d35400;
+        }
+
+        .btn-hard {
+            background-color: #c0392b;
+            box-shadow: 0 10px 0 #96281b;
+        }
+
+        .btn-hard:hover {
+            background-color: #e74c3c;
+            box-shadow: 0 12px 0 #96281b;
+        }
+
+        .btn:disabled {
+            background-color: #7f8c8d;
+            box-shadow: 0 10px 0 #5f6e6e;
+            cursor: not-allowed;
+            transform: none;
+            opacity: 0.7;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #notification-area {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+            pointer-events: none;
+            text-align: center;
+            width: 100%;
+        }
+
+        .notification {
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 60px;
+            font-size: 2rem;
+            display: inline-block;
+            animation: popInAndOut 2s forwards;
+            border: 3px solid var(--accent-color);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #shooter-score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2rem;
+            color: var(--accent-color);
+            z-index: 50;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+            display: none;
+        }
+
+        @keyframes popInAndOut {
+            0% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+
+            10% {
+                opacity: 1;
+                transform: scale(1.1);
+            }
+
+            20% {
+                transform: scale(1);
+            }
+
+            80% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            100% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+        }
+
+        /* Touch Controls (D-pad) */
+        #touch-controls {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #touch-fire {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(44, 62, 80, 0.5);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            color: white;
+            font-size: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+            user-select: none;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-btn.big {
+            width: 90px;
+            height: 90px;
+            background: rgba(231, 76, 60, 0.6);
+            font-size: 1.5rem;
+        }
+
+        .control-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.95);
+        }
+
+        @media (pointer: coarse) {
+            #touch-controls {
+                display: flex;
+            }
+
+            #touch-fire {
+                display: flex;
+            }
+
+            #controls-hint {
+                display: none;
+            }
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.1rem;
+            pointer-events: none;
+            z-index: 25;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        #controls-hint strong {
+            color: white;
+        }
+
+        @keyframes spinHelicopter {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spin-anim {
+            animation: spinHelicopter 0.4s linear 3;
+            display: inline-block;
+        }
+    </style>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+</head>
+
+<body>
+
+    <div id="game-wrapper">
+        <div id="game-container">
+            <!-- Map Container -->
+            <div id="map"></div>
+
+            <!-- UI Layer -->
+            <div id="ui-layer">
+                <div class="ui-box">
+                    <span class="ui-label">Doel</span>
+                    <span id="target-city">...</span>
+                </div>
+                <div class="ui-box">
+                    <span class="ui-label">Score</span>
+                    <span id="score">0</span> / <span id="total-cities">0</span>
+                </div>
+                <div class="ui-box">
+                    <span class="ui-label">Tijd</span>
+                    <span id="timer">...</span>
+                </div>
+            </div>
+
+            <div id="shooter-score-display">Enemies: <span id="kill-count">0</span>/25</div>
+
+            <!-- Game Objects -->
+            <div id="helicopter"><span id="heli-sprite">🚁</span></div>
+            <div id="notification-area"></div>
+
+            <!-- Touch Controls -->
+            <div id="touch-controls">
+                <div class="row">
+                    <button id="btn-up" class="control-btn">▲</button>
+                </div>
+                <div class="row">
+                    <button id="btn-left" class="control-btn">◀</button>
+                    <button id="btn-right" class="control-btn">▶</button>
+                </div>
+                <div class="row">
+                    <button id="btn-down" class="control-btn">▼</button>
+                </div>
+            </div>
+            <div id="touch-fire">
+                <button id="btn-fire" class="control-btn big">🔥</button>
+            </div>
+
+            <!-- Screens -->
+            <div id="start-screen" class="overlay">
+                <h1>Topocopter</h1>
+                <p>Welkom piloot! Bezoek alle 12 provincies en vind de steden.<br>Kies je niveau:</p>
+                <div id="loading" style="font-size: 1rem; margin-bottom: 2rem; color: #aaa;">Kaart laden...</div>
+
+                <div id="difficulty-buttons" class="difficulty-container">
+                    <button class="btn btn-easy" onclick="startGame(30)" disabled>Saai<br><span
+                            style="font-size:0.8rem">30s / stad</span></button>
+                    <button class="btn btn-medium" onclick="startGame(20)" disabled>Te Doen<br><span
+                            style="font-size:0.8rem">20s / stad</span></button>
+                    <button class="btn btn-hard" onclick="startGame(10)" disabled>Moeilijk<br><span
+                            style="font-size:0.8rem">10s / stad</span></button>
+                </div>
+                <div id="test-mode-btn" style="margin-top: 20px; display: none;">
+                    <button class="btn" style="background: #333; font-size: 1rem; padding: 10px 20px;"
+                        onclick="document.getElementById('start-screen').classList.add('hidden'); startShooterGame()">Test
+                        Shooter 🛸</button>
+                </div>
+            </div>
+
+            <div id="bonus-screen" class="overlay hidden">
+                <h1 style="color: #F1C40F">BONUSLEVEL!</h1>
+                <p>Pas op! Emojis vallen aan!<br>Gebruik <strong>OMHOOG/OMLAAG</strong> en <strong>SPATIE</strong>.</p>
+                <button class="btn btn-medium" onclick="startShooterGame()">START MISSIE</button>
+            </div>
+
+            <div id="end-screen" class="overlay hidden">
+                <h1 id="end-title">Missie Voltooid!</h1>
+                <p id="end-message">Geweldig gevlogen!</p>
+                <p style="font-size: 2rem; color: white;">Final Score: <span id="final-score">0</span></p>
+                <button class="btn btn-medium" onclick="location.reload()">Opnieuw Kiezen</button>
+            </div>
+
+            <div id="controls-hint">Gebruik de <strong>Pijltjestoetsen</strong> om te vliegen<br><small>(Spatie =
+                    Raket!)</small></div>
+        </div>
+    </div>
+
+
+    <script>
+        // Configuratie (Dynamic)
+        let gameWidth = window.innerWidth;
+        let gameHeight = window.innerHeight;
+        const collisionDistance = 40;
+        const scrollMargin = 200;
+        let timePerCity = 20;
+
+        window.addEventListener('resize', () => {
+            gameWidth = window.innerWidth;
+            gameHeight = window.innerHeight;
+            if (map && !isShooterMode) {
+                map.invalidateSize();
+            }
+        });
+
+        // Game State
+        let isPlaying = false;
+        let isShooterMode = false;
+        let score = 0;
+        let currentTarget = null;
+        let remainingCities = [];
+        let timerInterval = null;
+        let timeLeft = 0;
+        // Keys removed, using inputState
+
+        // Shooter State
+        let enemies = [];
+        let enemiesSpawnedCount = 0;
+        let enemiesDefeatedCount = 0;
+        let enemyInterval = null;
+        const totalEnemies = 25;
+
+        const helicopter = {
+            x: gameWidth / 2,
+            y: gameHeight / 2,
+            speed: 7,
+            element: document.getElementById('helicopter'),
+            facingRight: false
+        };
+
+        const citiesData = [
+            { name: "Groningen", lat: 53.2194, lng: 6.5665 },
+            { name: "Leeuwarden", lat: 53.2012, lng: 5.7999 },
+            { name: "Assen", lat: 52.9967, lng: 6.5642 },
+            { name: "Zwolle", lat: 52.5168, lng: 6.0830 },
+            { name: "Lelystad", lat: 52.5083, lng: 5.4750 },
+            { name: "Amsterdam", lat: 52.3702, lng: 4.8952 },
+            { name: "Haarlem", lat: 52.3874, lng: 4.6462 },
+            { name: "Utrecht", lat: 52.0907, lng: 5.1214 },
+            { name: "Den Haag", lat: 52.0705, lng: 4.3007 },
+            { name: "Rotterdam", lat: 51.9244, lng: 4.4777 },
+            { name: "Middelburg", lat: 51.4988, lng: 3.6110 },
+            { name: "'s-Hertogenbosch", lat: 51.6978, lng: 5.3037 },
+            { name: "Eindhoven", lat: 51.4416, lng: 5.4697 },
+            { name: "Arnhem", lat: 51.9851, lng: 5.8987 },
+            { name: "Maastricht", lat: 50.8514, lng: 5.6910 },
+            { name: "Enschede", lat: 52.2215, lng: 6.8937 }
+        ];
+
+        const provinceColors = {
+            "Groningen": "#e74c3c",
+            "Fryslân": "#3498db", "Friesland": "#3498db",
+            "Drenthe": "#9b59b6",
+            "Overijssel": "#f1c40f",
+            "Flevoland": "#1abc9c",
+            "Gelderland": "#e67e22",
+            "Utrecht": "#2ecc71",
+            "Noord-Holland": "#34495e",
+            "Zuid-Holland": "#e84393",
+            "Zeeland": "#0984e3",
+            "Noord-Brabant": "#d35400",
+            "Limburg": "#8e44ad"
+        };
+
+        function getProvinceColor(name) { return provinceColors[name] || "#7f8c8d"; }
+
+        let cityMarkers = {};
+        let map;
+
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                dragging: false, touchZoom: false, doubleClickZoom: false, scrollWheelZoom: false, boxZoom: false, keyboard: false, attributionControl: false, zoomAnimation: true
+            });
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+                minZoom: 6, maxZoom: 12
+            }).addTo(map);
+
+            const provinceLayer = L.geoJSON(null, {
+                style: function (feature) {
+                    return { color: "#ffffff", weight: 3, opacity: 0.9, fillColor: getProvinceColor(feature.properties.statnaam), fillOpacity: 0.3 };
+                },
+                onEachFeature: function (feature, layer) {
+                    if (feature.properties && feature.properties.statnaam) {
+                        const center = layer.getBounds().getCenter();
+                        const label = L.divIcon({
+                            className: 'province-label', html: feature.properties.statnaam, iconSize: [200, 20], iconAnchor: [100, 10]
+                        });
+                        L.marker(center, { icon: label, interactive: false, zIndexOffset: -500 }).addTo(map);
+                    }
+                }
+            }).addTo(map);
+
+            fetch('https://cartomap.github.io/nl/wgs84/provincie_2022.geojson')
+                .then(res => res.json())
+                .then(data => {
+                    provinceLayer.addData(data);
+                    provinceLayer.bringToBack();
+                })
+                .catch(err => console.error(err));
+
+            const bounds = L.latLngBounds(L.latLng(50.5, 3.2), L.latLng(53.6, 7.3));
+            map.setMaxBounds(bounds.pad(0.5));
+            map.setView([52.2, 5.3], 9);
+
+            map.whenReady(() => {
+                map.invalidateSize();
+                createCityMarkers();
+                const buttons = document.querySelectorAll('#difficulty-buttons button');
+                buttons.forEach(btn => btn.removeAttribute('disabled'));
+
+                // Test Mode
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('testmode') === 'on') {
+                    document.getElementById('test-mode-btn').style.display = 'block';
+                }
+
+                document.getElementById('loading').style.display = 'none';
+                helicopter.x = gameWidth / 2;
+                helicopter.y = gameHeight / 2;
+                updateHelicopterPosition();
+            });
+        }
+
+        function createCityMarkers() {
+            citiesData.forEach(city => {
+                const icon = L.divIcon({
+                    className: 'city-marker-container',
+                    html: `<div id="city-${city.name}" class="city"></div>`,
+                    iconSize: [20, 20], iconAnchor: [10, 10]
+                });
+                const marker = L.marker([city.lat, city.lng], { icon: icon, zIndexOffset: 1000 }).addTo(map);
+                cityMarkers[city.name] = marker;
+            });
+            document.getElementById('total-cities').innerText = citiesData.length;
+        }
+
+        // Input Handling
+        const inputState = { up: false, down: false, left: false, right: false };
+
+        window.addEventListener('keydown', (e) => {
+            // Prevent Scroll
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", " "].indexOf(e.key) > -1 ||
+                [32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+                e.preventDefault();
+            }
+
+            if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) { fireRocket('🚀'); }
+            if (e.code === 'KeyH' || e.key === 'h' || e.key === 'H') { fireRocket('❤️'); } // Heart Easter Egg
+
+            // Spin Easter Egg (F)
+            if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
+                const sprite = document.getElementById('heli-sprite');
+                if (sprite && !sprite.classList.contains('spin-anim')) {
+                    sprite.classList.add('spin-anim');
+                    sprite.addEventListener('animationend', () => {
+                        sprite.classList.remove('spin-anim');
+                    }, { once: true });
+                }
+            }
+
+            // Turd Easter Egg (T)
+            if (e.code === 'KeyT' || e.key === 't' || e.key === 'T') {
+                const sprite = document.getElementById('heli-sprite');
+                if (sprite) {
+                    sprite.innerText = sprite.innerText === '🚁' ? '💩' : '🚁';
+                }
+            }
+
+            if (e.code === 'ArrowUp' || e.key === 'ArrowUp' || e.keyCode === 38) inputState.up = true;
+            if (e.code === 'ArrowDown' || e.key === 'ArrowDown' || e.keyCode === 40) inputState.down = true;
+            if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft' || e.keyCode === 37) inputState.left = true;
+            if (e.code === 'ArrowRight' || e.key === 'ArrowRight' || e.keyCode === 39) inputState.right = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowUp' || e.key === 'ArrowUp' || e.keyCode === 38) inputState.up = false;
+            if (e.code === 'ArrowDown' || e.key === 'ArrowDown' || e.keyCode === 40) inputState.down = false;
+            if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft' || e.keyCode === 37) inputState.left = false;
+            if (e.code === 'ArrowRight' || e.key === 'ArrowRight' || e.keyCode === 39) inputState.right = false;
+        });
+
+        const setupTouchBtn = (id, direction) => {
+            const btn = document.getElementById(id);
+            const start = (e) => { e.preventDefault(); inputState[direction] = true; btn.style.background = 'rgba(255,255,255,0.4)'; };
+            const end = (e) => { e.preventDefault(); inputState[direction] = false; btn.style.background = ''; };
+            btn.addEventListener('touchstart', start); btn.addEventListener('touchend', end);
+            btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', end);
+        };
+        setupTouchBtn('btn-up', 'up');
+        setupTouchBtn('btn-down', 'down');
+        setupTouchBtn('btn-left', 'left');
+        setupTouchBtn('btn-right', 'right');
+
+        const fireBtn = document.getElementById('btn-fire');
+        const fStart = (e) => { e.preventDefault(); fireRocket('🚀'); fireBtn.style.background = 'rgba(255,255,255,0.4)'; };
+        const fEnd = (e) => { e.preventDefault(); fireBtn.style.background = 'rgba(231, 76, 60, 0.6)'; };
+        fireBtn.addEventListener('touchstart', fStart); fireBtn.addEventListener('touchend', fEnd);
+        fireBtn.addEventListener('mousedown', fStart); fireBtn.addEventListener('mouseup', fEnd);
+
+        function fireRocket(projectileEmoji = '🚀') {
+            const container = document.getElementById('game-container');
+            const rocket = document.createElement('div');
+            rocket.className = 'rocket';
+            rocket.innerText = projectileEmoji;
+            container.appendChild(rocket);
+
+            const startX = helicopter.x;
+            const startY = helicopter.y;
+            rocket.style.left = startX + 'px';
+            rocket.style.top = startY + 'px';
+
+            let isRight = helicopter.facingRight;
+            if (isShooterMode) isRight = true;
+
+            rocket.style.transform = isRight ? "rotate(45deg)" : "scaleX(-1) rotate(45deg)";
+
+            rocket.dataset.x = startX;
+            rocket.dataset.y = startY;
+            rocket.dataset.dx = isRight ? 15 : -15;
+
+            if (isShooterMode) {
+                rocket.style.transition = 'none';
+                activeRockets.push({ el: rocket, x: startX, y: startY, dx: 20 });
+            } else {
+                setTimeout(() => {
+                    const distance = 1000;
+                    rocket.style.transform = isRight ? `translate(${distance}px, -200px) rotate(45deg)` : `translate(-${distance}px, -200px) scaleX(-1) rotate(45deg)`;
+                    rocket.style.opacity = '0';
+                }, 50);
+                setTimeout(() => rocket.remove(), 1000);
+            }
+        }
+
+        let activeRockets = [];
+
+        function startGame(selectedTimePerCity) {
+            if (selectedTimePerCity) timePerCity = selectedTimePerCity;
+
+            score = 0;
+            remainingCities = [...citiesData];
+            isPlaying = true;
+            isShooterMode = false;
+            timeLeft = remainingCities.length * timePerCity;
+
+            document.getElementById('score').innerText = score;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('timer').classList.remove('timer-warning');
+            document.getElementById('map').classList.remove('fade-out');
+            document.getElementById('ui-layer').style.opacity = 1;
+            document.getElementById('shooter-score-display').style.display = 'none';
+
+            Object.values(cityMarkers).forEach(marker => {
+                const el = marker.getElement().querySelector('.city');
+                if (el) el.classList.remove('found');
+            });
+
+            map.setView([52.2, 5.3], 9);
+            map.invalidateSize();
+
+            helicopter.x = gameWidth / 2;
+            helicopter.y = gameHeight / 2;
+            helicopter.element.style.transform = 'scaleX(1)';
+            helicopter.facingRight = false;
+
+            updateHelicopterPosition();
+            pickNewTarget();
+            startTimer();
+
+            if (!gameLoopRunning) {
+                gameLoopRunning = true;
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function startTimer() {
+            updateTimerDisplay();
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!isShooterMode) {
+                    timeLeft--;
+                    updateTimerDisplay();
+                    if (timeLeft <= 0) endGame(true);
+                    else if (timeLeft <= 10) document.getElementById('timer').classList.add('timer-warning');
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            document.getElementById('timer').innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function pickNewTarget() {
+            if (remainingCities.length === 0) {
+                endGame(false);
+                return;
+            }
+            const index = Math.floor(Math.random() * remainingCities.length);
+            currentTarget = remainingCities[index];
+            remainingCities.splice(index, 1);
+            document.getElementById('target-city').innerText = currentTarget.name;
+            showNotification(`Zoek ${currentTarget.name}!`);
+        }
+
+        function endGame(timeUp) {
+            isPlaying = false;
+            clearInterval(timerInterval);
+
+            if (timeUp) {
+                document.getElementById('end-title').innerText = "Tijd is om!";
+                document.getElementById('end-title').style.color = "#e74c3c";
+                document.getElementById('end-message').innerText = "Je benzine is op.";
+                document.getElementById('final-score').innerText = score;
+                document.getElementById('end-screen').classList.remove('hidden');
+            } else {
+                // Direct transition to Shooter Mode
+                startShooterGame();
+            }
+        }
+
+        // --- SHOOTER MODE ---
+        function startShooterGame() {
+            document.getElementById('bonus-screen').classList.add('hidden');
+            isShooterMode = true;
+            isPlaying = true;
+
+            // Reset Shooter State
+            activeRockets = [];
+            enemies = [];
+            enemiesSpawnedCount = 0;
+            enemiesDefeatedCount = 0;
+            updateKillCount();
+
+            // UI Changes
+            document.getElementById('map').classList.add('fade-out');
+            document.getElementById('ui-layer').style.opacity = 0;
+            document.getElementById('shooter-score-display').style.display = 'block';
+
+            // Move Heli to Battle Station
+            helicopter.element.classList.add('shooter-mode');
+            helicopter.x = 100;
+            helicopter.y = gameHeight / 2;
+            helicopter.facingRight = true;
+            helicopter.element.style.transform = 'scaleX(-1)';
+            updateHelicopterPosition();
+
+            // Start Spawning
+            enemyInterval = setInterval(spawnEnemy, 1500);
+
+            if (!gameLoopRunning) {
+                gameLoopRunning = true;
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function spawnEnemy() {
+            if (!isPlaying || !isShooterMode) return;
+            if (enemiesSpawnedCount >= totalEnemies) {
+                clearInterval(enemyInterval);
+                return;
+            }
+
+            const enemyEmojis = ['👾', '👽', '🛸', '☄️', '🕷️', '🦇'];
+            const startY = Math.random() * (gameHeight - 100) + 50;
+
+            const el = document.createElement('div');
+            el.className = 'enemy';
+            el.innerText = enemyEmojis[Math.floor(Math.random() * enemyEmojis.length)];
+            el.style.left = (gameWidth + 50) + 'px';
+            el.style.top = startY + 'px';
+            document.getElementById('game-container').appendChild(el);
+
+            enemies.push({ el: el, x: gameWidth + 50, y: startY, active: true });
+            enemiesSpawnedCount++;
+        }
+
+        function updateShooterEntities() {
+            // Move Robots
+            activeRockets.forEach((r, i) => {
+                r.x += r.dx;
+                r.el.style.left = r.x + 'px';
+                if (r.x > gameWidth) {
+                    r.el.remove();
+                    activeRockets.splice(i, 1);
+                }
+            });
+
+            // Move Enemies
+            enemies.forEach(e => {
+                if (!e.active) return;
+                e.x -= 8; // FASTER ENEMIES
+                e.el.style.left = e.x + 'px';
+
+                // Collision with Rocket
+                activeRockets.forEach((r, ri) => {
+                    if (Math.abs(r.x - e.x) < 50 && Math.abs(r.y - e.y) < 50) {
+                        e.active = false;
+                        createExplosion(e.x, e.y);
+                        e.el.remove();
+                        r.el.remove();
+                        activeRockets.splice(ri, 1);
+                        enemiesDefeatedCount++;
+                        updateKillCount();
+                        checkShooterWin();
+                    }
+                });
+
+                // Collision with Helicopter
+                if (Math.abs(helicopter.x - e.x) < 60 && Math.abs(helicopter.y - e.y) < 60) {
+                    gameOverShooter();
+                }
+
+                // Offscreen
+                if (e.x < -100) {
+                    e.active = false;
+                    e.el.remove();
+                    checkShooterWin();
+                }
+            });
+        }
+
+        function gameOverShooter() {
+            isPlaying = false;
+            clearInterval(enemyInterval);
+            document.getElementById('end-title').innerText = "GAME OVER";
+            document.getElementById('end-title').style.color = "#e74c3c";
+            document.getElementById('end-message').innerText = "Je bent geraakt door een alien!";
+            document.getElementById('final-score').innerText = enemiesDefeatedCount;
+            document.getElementById('end-screen').classList.remove('hidden');
+        }
+
+        function createExplosion(x, y) {
+            const el = document.createElement('div');
+            el.className = 'explosion';
+            el.innerText = '💥';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.getElementById('game-container').appendChild(el);
+            setTimeout(() => el.remove(), 500);
+        }
+
+        function updateKillCount() {
+            document.getElementById('kill-count').innerText = enemiesDefeatedCount;
+        }
+
+        function checkShooterWin() {
+            const activeEnemies = enemies.filter(e => e.active).length;
+            if (enemiesSpawnedCount >= totalEnemies && activeEnemies === 0) {
+                endShooterGame();
+            }
+        }
+
+        function endShooterGame() {
+            isPlaying = false;
+            clearInterval(enemyInterval);
+            document.getElementById('end-title').innerText = "Missie Voltooid!";
+            document.getElementById('end-title').style.color = "#F1C40F";
+            document.getElementById('end-message').innerText = "De luchtruim is veilig!";
+            document.getElementById('final-score').innerText = enemiesDefeatedCount;
+            document.getElementById('end-screen').classList.remove('hidden');
+        }
+
+        // Main Loop
+        function checkCollision() {
+            if (!currentTarget) return;
+
+            const targetName = currentTarget.name;
+            const marker = cityMarkers[targetName];
+            if (!marker) return;
+
+            // Get screen position of the target marker
+            const mapLatLng = marker.getLatLng();
+            const paramPoint = map.latLngToContainerPoint(mapLatLng);
+
+            // Precision Distance Check
+            // User requested "5 pixels around the middle". 
+            // City marker is approx 20px wide (radius 10).
+            // We use a threshold of 20px total distance between centers to be precise but playable.
+            const dist = Math.hypot(helicopter.x - paramPoint.x, helicopter.y - paramPoint.y);
+
+            if (dist < 40) {
+                // Found!
+                score++;
+                document.getElementById('score').innerText = score;
+                showNotification(`Gevonden: ${targetName}!`);
+
+                const el = marker.getElement().querySelector('.city');
+                if (el) el.classList.add('found');
+
+                pickNewTarget();
+            }
+        }
+
+        function updateHelicopter() {
+            if (!isPlaying) return;
+
+            const speed = helicopter.speed;
+            let dx = 0;
+            let dy = 0;
+
+            if (inputState.up) dy = -speed;
+            if (inputState.down) dy = speed;
+
+            if (!isShooterMode) {
+                if (inputState.left) dx = -speed;
+                if (inputState.right) dx = speed;
+            }
+
+            // Movement & Pans
+            let nextX = helicopter.x + dx;
+            let nextY = helicopter.y + dy;
+
+            // Clamp
+            nextX = Math.max(0, Math.min(gameWidth, nextX));
+            nextY = Math.max(0, Math.min(gameHeight, nextY));
+
+            if (!isShooterMode) {
+                // Map Panning Logic
+                const rightThreshold = gameWidth - scrollMargin;
+                const leftThreshold = scrollMargin;
+                const bottomThreshold = gameHeight - scrollMargin;
+                const topThreshold = scrollMargin;
+
+                let mapPanX = 0, mapPanY = 0;
+
+                if (dx > 0 && nextX > rightThreshold) { mapPanX = speed; nextX = rightThreshold; }
+                else if (dx < 0 && nextX < leftThreshold) { mapPanX = -speed; nextX = leftThreshold; }
+
+                if (dy > 0 && nextY > bottomThreshold) { mapPanY = speed; nextY = bottomThreshold; }
+                else if (dy < 0 && nextY < topThreshold) { mapPanY = -speed; nextY = topThreshold; }
+
+                if (mapPanX !== 0 || mapPanY !== 0) map.panBy([mapPanX, mapPanY], { animate: false });
+
+                // Direction
+                if (dx < 0) { helicopter.element.style.transform = 'scaleX(1)'; helicopter.facingRight = false; }
+                if (dx > 0) { helicopter.element.style.transform = 'scaleX(-1)'; helicopter.facingRight = true; }
+            } else {
+                // Shooter Mode limits
+                // Always face right
+                helicopter.element.style.transform = 'scaleX(-1)';
+                // Constrain X (can't move X)
+                nextX = 100;
+            }
+
+            helicopter.x = nextX;
+            helicopter.y = nextY;
+            updateHelicopterPosition();
+        }
+
+        function updateHelicopterPosition() {
+            helicopter.element.style.left = helicopter.x + 'px';
+            helicopter.element.style.top = helicopter.y + 'px';
+        }
+
+        function showNotification(text) {
+            const area = document.getElementById('notification-area');
+            const el = document.createElement('div');
+            el.className = 'notification';
+            el.innerText = text;
+            area.appendChild(el);
+            setTimeout(() => { el.remove(); }, 2000);
+        }
+
+        let gameLoopRunning = false;
+        function gameLoop() {
+            updateHelicopter();
+            if (!isShooterMode) checkCollision();
+            else updateShooterEntities();
+
+            if (isPlaying) requestAnimationFrame(gameLoop);
+            else gameLoopRunning = false;
+        }
+
+        initMap();
+
+    </script>
+</body>
+
+</html>
