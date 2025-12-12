@@ -752,6 +752,14 @@
                 }
             }
 
+            // S Key (Start Shooter)
+            if (e.code === 'KeyS' || e.key === 's' || e.key === 'S') {
+                document.getElementById('start-screen').classList.add('hidden');
+                document.getElementById('end-screen').classList.add('hidden');
+                document.getElementById('bonus-screen').classList.add('hidden');
+                startShooterGame();
+            }
+
             if (e.code === 'ArrowUp' || e.key === 'ArrowUp' || e.keyCode === 38) inputState.up = true;
             if (e.code === 'ArrowDown' || e.key === 'ArrowDown' || e.keyCode === 40) inputState.down = true;
             if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft' || e.keyCode === 37) inputState.left = true;
