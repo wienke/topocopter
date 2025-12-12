@@ -384,8 +384,9 @@
         /* Touch Controls (D-pad) */
         #touch-controls {
             position: absolute;
-            bottom: 30px;
+            bottom: 50px;
             right: 30px;
+            padding-bottom: env(safe-area-inset-bottom);
             z-index: 1000;
             display: none;
             flex-direction: column;
@@ -397,6 +398,7 @@
             position: absolute;
             bottom: 50px;
             left: 50px;
+            padding-bottom: env(safe-area-inset-bottom);
             z-index: 1000;
             display: none;
         }
@@ -407,13 +409,13 @@
         }
 
         .control-btn {
-            width: 70px;
-            height: 70px;
+            width: 80px;
+            height: 80px;
             background: rgba(44, 62, 80, 0.5);
             border: 3px solid rgba(255, 255, 255, 0.6);
             border-radius: 50%;
             color: white;
-            font-size: 30px;
+            font-size: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -425,10 +427,10 @@
         }
 
         .control-btn.big {
-            width: 90px;
-            height: 90px;
+            width: 100px;
+            height: 100px;
             background: rgba(231, 76, 60, 0.6);
-            font-size: 1.5rem;
+            font-size: 2rem;
         }
 
         .control-btn:active {
@@ -508,7 +510,8 @@
                 </div>
             </div>
 
-            <div id="shooter-score-display">Enemies: <span id="kill-count">0</span>/25</div>
+            <div id="shooter-score-display">Score: <span id="kill-count">0</span> | Missed: <span
+                    id="missed-count">0</span>/3</div>
 
             <!-- Game Objects -->
             <div id="helicopter"><span id="heli-sprite">🚁</span></div>
@@ -599,10 +602,11 @@
 
         // Shooter State
         let enemies = [];
-        let enemiesSpawnedCount = 0;
         let enemiesDefeatedCount = 0;
-        let enemyInterval = null;
-        const totalEnemies = 25;
+        let missedEnemies = 0;
+        let nextSpawnTime = 0;
+        let spawnInterval = 2000;
+        let enemyBaseSpeed = 5;
 
         const helicopter = {
             x: gameWidth / 2,
@@ -917,14 +921,18 @@
         // --- SHOOTER MODE ---
         function startShooterGame() {
             document.getElementById('bonus-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
             isShooterMode = true;
             isPlaying = true;
 
             // Reset Shooter State
             activeRockets = [];
             enemies = [];
-            enemiesSpawnedCount = 0;
             enemiesDefeatedCount = 0;
+            missedEnemies = 0;
+            enemyBaseSpeed = 5;
+            spawnInterval = 2000;
             updateKillCount();
 
             // UI Changes
@@ -941,7 +949,7 @@
             updateHelicopterPosition();
 
             // Start Spawning
-            enemyInterval = setInterval(spawnEnemy, 1500);
+            nextSpawnTime = Date.now() + 1000;
 
             if (!gameLoopRunning) {
                 gameLoopRunning = true;
@@ -951,10 +959,6 @@
 
         function spawnEnemy() {
             if (!isPlaying || !isShooterMode) return;
-            if (enemiesSpawnedCount >= totalEnemies) {
-                clearInterval(enemyInterval);
-                return;
-            }
 
             const enemyEmojis = ['👾', '👽', '🛸', '☄️', '🕷️', '🦇'];
             const startY = Math.random() * (gameHeight - 100) + 50;
@@ -966,11 +970,25 @@
             el.style.top = startY + 'px';
             document.getElementById('game-container').appendChild(el);
 
-            enemies.push({ el: el, x: gameWidth + 50, y: startY, active: true });
-            enemiesSpawnedCount++;
+            // Progressive Difficulty: Speed increases with kills
+            const variableSpeed = enemyBaseSpeed + (enemiesDefeatedCount * 0.2);
+            // Random flux
+            const speed = variableSpeed + (Math.random() * 2);
+
+            enemies.push({ el: el, x: gameWidth + 50, y: startY, speed: speed, active: true });
+
+            // Next Spawn: Faster as you kill
+            const reduction = Math.min(1500, enemiesDefeatedCount * 30);
+            const nextDelay = Math.max(500, 2000 - reduction);
+            nextSpawnTime = Date.now() + nextDelay;
         }
 
         function updateShooterEntities() {
+            // Spawn Check
+            if (Date.now() > nextSpawnTime) {
+                spawnEnemy();
+            }
+
             // Move Robots
             activeRockets.forEach((r, i) => {
                 r.x += r.dx;
@@ -984,7 +1002,8 @@
             // Move Enemies
             enemies.forEach(e => {
                 if (!e.active) return;
-                e.x -= 8; // FASTER ENEMIES
+
+                e.x -= e.speed; // Individual speed
                 e.el.style.left = e.x + 'px';
 
                 // Collision with Rocket
@@ -997,31 +1016,33 @@
                         activeRockets.splice(ri, 1);
                         enemiesDefeatedCount++;
                         updateKillCount();
-                        checkShooterWin();
                     }
                 });
 
                 // Collision with Helicopter
                 if (Math.abs(helicopter.x - e.x) < 60 && Math.abs(helicopter.y - e.y) < 60) {
-                    gameOverShooter();
+                    gameOverShooter("Je bent geraakt!");
                 }
 
-                // Offscreen
+                // Offscreen (Missed)
                 if (e.x < -100) {
                     e.active = false;
                     e.el.remove();
-                    checkShooterWin();
+                    missedEnemies++;
+                    updateKillCount();
+                    if (missedEnemies > 3) {
+                        gameOverShooter("Te veel vijanden gemist!");
+                    }
                 }
             });
         }
 
-        function gameOverShooter() {
+        function gameOverShooter(reason) {
             isPlaying = false;
-            clearInterval(enemyInterval);
             document.getElementById('end-title').innerText = "GAME OVER";
             document.getElementById('end-title').style.color = "#e74c3c";
-            document.getElementById('end-message').innerText = "Je bent geraakt door een alien!";
-            document.getElementById('final-score').innerText = enemiesDefeatedCount;
+            document.getElementById('end-message').innerText = reason;
+            document.getElementById('final-score').innerText = enemiesDefeatedCount + " Punten";
             document.getElementById('end-screen').classList.remove('hidden');
         }
 
@@ -1037,24 +1058,10 @@
 
         function updateKillCount() {
             document.getElementById('kill-count').innerText = enemiesDefeatedCount;
+            document.getElementById('missed-count').innerText = missedEnemies;
         }
 
-        function checkShooterWin() {
-            const activeEnemies = enemies.filter(e => e.active).length;
-            if (enemiesSpawnedCount >= totalEnemies && activeEnemies === 0) {
-                endShooterGame();
-            }
-        }
 
-        function endShooterGame() {
-            isPlaying = false;
-            clearInterval(enemyInterval);
-            document.getElementById('end-title').innerText = "Missie Voltooid!";
-            document.getElementById('end-title').style.color = "#F1C40F";
-            document.getElementById('end-message').innerText = "De luchtruim is veilig!";
-            document.getElementById('final-score').innerText = enemiesDefeatedCount;
-            document.getElementById('end-screen').classList.remove('hidden');
-        }
 
         // Main Loop
         function checkCollision() {
