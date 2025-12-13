@@ -607,7 +607,7 @@
         let nextSpawnTime = 0;
         let spawnInterval = 2000;
         let enemyBaseSpeed = 5;
-        let touchTarget = null;
+        let touchTargetLatLng = null;
 
         const helicopter = {
             x: gameWidth / 2,
@@ -694,7 +694,7 @@
 
             map.on('click', (e) => {
                 if (!isPlaying || isShooterMode) return;
-                touchTarget = e.containerPoint;
+                touchTargetLatLng = e.latlng;
 
                 // Minimal visual feedback
                 const dot = document.createElement('div');
@@ -1127,7 +1127,7 @@
 
             // Manual Input Check
             if (inputState.up || inputState.down || inputState.left || inputState.right) {
-                touchTarget = null; // Cancel auto-pilot
+                touchTargetLatLng = null; // Cancel auto-pilot
                 if (inputState.up) dy = -speed;
                 if (inputState.down) dy = speed;
                 if (!isShooterMode) {
@@ -1136,14 +1136,15 @@
                 }
             }
             // Auto-Pilot (Touch)
-            else if (touchTarget && !isShooterMode) {
-                const dxRaw = touchTarget.x - helicopter.x;
-                const dyRaw = touchTarget.y - helicopter.y;
+            else if (touchTargetLatLng && !isShooterMode) {
+                const targetPoint = map.latLngToContainerPoint(touchTargetLatLng);
+                const dxRaw = targetPoint.x - helicopter.x;
+                const dyRaw = targetPoint.y - helicopter.y;
                 const dist = Math.hypot(dxRaw, dyRaw);
 
                 if (dist < speed) {
                     // Arrived
-                    touchTarget = null;
+                    touchTargetLatLng = null;
                 } else {
                     const angle = Math.atan2(dyRaw, dxRaw);
                     dx = Math.cos(angle) * speed;
@@ -1165,25 +1166,43 @@
             nextY = Math.max(0, Math.min(gameHeight, nextY));
 
             if (!isShooterMode) {
-                // Map Panning Logic
-                const rightThreshold = gameWidth - scrollMargin;
-                const leftThreshold = scrollMargin;
-                const bottomThreshold = gameHeight - scrollMargin;
-                const topThreshold = scrollMargin;
+                if (touchTargetLatLng) {
+                    // Auto-Pilot: Camera Follows Helicopter (Centering)
+                    const cx = gameWidth / 2;
+                    const cy = gameHeight / 2;
+                    const panX = (nextX - cx) * 0.1; // Smooth follow
+                    const panY = (nextY - cy) * 0.1;
 
-                let mapPanX = 0, mapPanY = 0;
+                    if (Math.abs(panX) > 1 || Math.abs(panY) > 1) {
+                        map.panBy([panX, panY], { animate: false });
+                        // Shift helicopter opposite to pan to stay world-locked visual
+                    }
 
-                if (dx > 0 && nextX > rightThreshold) { mapPanX = speed; nextX = rightThreshold; }
-                else if (dx < 0 && nextX < leftThreshold) { mapPanX = -speed; nextX = leftThreshold; }
+                    // Direction for Auto-Pilot
+                    if (dx < 0) { helicopter.element.style.transform = 'scaleX(1)'; helicopter.facingRight = false; }
+                    if (dx > 0) { helicopter.element.style.transform = 'scaleX(-1)'; helicopter.facingRight = true; }
 
-                if (dy > 0 && nextY > bottomThreshold) { mapPanY = speed; nextY = bottomThreshold; }
-                else if (dy < 0 && nextY < topThreshold) { mapPanY = -speed; nextY = topThreshold; }
+                } else {
+                    // Manual Mode: Push Edges
+                    const rightThreshold = gameWidth - scrollMargin;
+                    const leftThreshold = scrollMargin;
+                    const bottomThreshold = gameHeight - scrollMargin;
+                    const topThreshold = scrollMargin;
 
-                if (mapPanX !== 0 || mapPanY !== 0) map.panBy([mapPanX, mapPanY], { animate: false });
+                    let mapPanX = 0, mapPanY = 0;
 
-                // Direction
-                if (dx < 0) { helicopter.element.style.transform = 'scaleX(1)'; helicopter.facingRight = false; }
-                if (dx > 0) { helicopter.element.style.transform = 'scaleX(-1)'; helicopter.facingRight = true; }
+                    if (dx > 0 && nextX > rightThreshold) { mapPanX = speed; nextX = rightThreshold; }
+                    else if (dx < 0 && nextX < leftThreshold) { mapPanX = -speed; nextX = leftThreshold; }
+
+                    if (dy > 0 && nextY > bottomThreshold) { mapPanY = speed; nextY = bottomThreshold; }
+                    else if (dy < 0 && nextY < topThreshold) { mapPanY = -speed; nextY = topThreshold; }
+
+                    if (mapPanX !== 0 || mapPanY !== 0) map.panBy([mapPanX, mapPanY], { animate: false });
+
+                    // Direction
+                    if (dx < 0) { helicopter.element.style.transform = 'scaleX(1)'; helicopter.facingRight = false; }
+                    if (dx > 0) { helicopter.element.style.transform = 'scaleX(-1)'; helicopter.facingRight = true; }
+                }
             } else {
                 // Shooter Mode limits
                 // Always face right
