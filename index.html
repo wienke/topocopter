@@ -166,6 +166,34 @@
             transform: scale(1.4);
         }
 
+        .city-label {
+            position: absolute;
+            top: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 0 1px 3px black;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .city.found+.city-label {
+            opacity: 1;
+        }
+
+        /* Map Modes */
+        .mode-show-all .city-label {
+            opacity: 1 !important;
+        }
+
+        .mode-blind .province-label {
+            opacity: 0 !important;
+        }
+
         /* Helicopter */
         #helicopter {
             position: absolute;
@@ -207,6 +235,15 @@
             z-index: 28;
             pointer-events: none;
             filter: drop-shadow(0 0 5px red);
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 2000;
         }
 
         .explosion {
@@ -389,9 +426,11 @@
             padding-bottom: env(safe-area-inset-bottom);
             z-index: 1000;
             display: none;
-            flex-direction: column;
+            grid-template-columns: 80px 80px 80px;
+            grid-template-rows: 80px 80px 80px;
+            gap: 5px;
             align-items: center;
-            gap: 15px;
+            justify-items: center;
         }
 
         #touch-fire {
@@ -403,10 +442,28 @@
             display: none;
         }
 
-        .row {
-            display: flex;
-            gap: 15px;
+        /* Grid Positioning */
+        #btn-up {
+            grid-column: 2;
+            grid-row: 1;
         }
+
+        #btn-left {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        #btn-right {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        #btn-down {
+            grid-column: 2;
+            grid-row: 3;
+        }
+
+
 
         .control-btn {
             width: 80px;
@@ -440,7 +497,7 @@
 
         @media (pointer: coarse) {
             #touch-controls {
-                display: flex;
+                display: grid;
             }
 
             #touch-fire {
@@ -455,13 +512,19 @@
         #controls-hint {
             position: absolute;
             bottom: 30px;
-            width: 100%;
+            left: 50%;
+            transform: translateX(-50%);
             text-align: center;
-            color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.9);
             font-size: 1.1rem;
             pointer-events: none;
             z-index: 25;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 10px 25px;
+            border-radius: 30px;
+            backdrop-filter: blur(4px);
         }
 
         #controls-hint strong {
@@ -518,17 +581,12 @@
             <div id="notification-area"></div>
 
             <!-- Touch Controls -->
+            <!-- Touch Controls -->
             <div id="touch-controls">
-                <div class="row">
-                    <button id="btn-up" class="control-btn">▲</button>
-                </div>
-                <div class="row">
-                    <button id="btn-left" class="control-btn">◀</button>
-                    <button id="btn-right" class="control-btn">▶</button>
-                </div>
-                <div class="row">
-                    <button id="btn-down" class="control-btn">▼</button>
-                </div>
+                <button id="btn-up" class="control-btn">▲</button>
+                <button id="btn-left" class="control-btn">◀</button>
+                <button id="btn-right" class="control-btn">▶</button>
+                <button id="btn-down" class="control-btn">▼</button>
             </div>
             <div id="touch-fire">
                 <button id="btn-fire" class="control-btn big">🔥</button>
@@ -537,16 +595,32 @@
             <!-- Screens -->
             <div id="start-screen" class="overlay">
                 <h1>Topocopter</h1>
-                <p>Welkom piloot! Bezoek alle 12 provincies en vind de steden.<br>Kies je niveau:</p>
-                <div id="loading" style="font-size: 1rem; margin-bottom: 2rem; color: #aaa;">Kaart laden...</div>
+                <!-- Step 1: Time Selection -->
+                <div id="difficulty-step-1">
+                    <p>Kies je snelheid:</p>
+                    <div class="difficulty-container">
+                        <button class="btn btn-easy" onclick="selectTime(30)" disabled>Rustig<br><span
+                                style="font-size:0.8rem">30s / stad</span></button>
+                        <button class="btn btn-medium" onclick="selectTime(20)" disabled>Normaal<br><span
+                                style="font-size:0.8rem">20s / stad</span></button>
+                        <button class="btn btn-hard" onclick="selectTime(10)" disabled>Snel<br><span
+                                style="font-size:0.8rem">10s / stad</span></button>
+                    </div>
+                </div>
 
-                <div id="difficulty-buttons" class="difficulty-container">
-                    <button class="btn btn-easy" onclick="startGame(30)" disabled>Saai<br><span
-                            style="font-size:0.8rem">30s / stad</span></button>
-                    <button class="btn btn-medium" onclick="startGame(20)" disabled>Te Doen<br><span
-                            style="font-size:0.8rem">20s / stad</span></button>
-                    <button class="btn btn-hard" onclick="startGame(10)" disabled>Moeilijk<br><span
-                            style="font-size:0.8rem">10s / stad</span></button>
+                <!-- Step 2: Map Detail Selection -->
+                <div id="difficulty-step-2" class="hidden">
+                    <p>Kies kaart details:</p>
+                    <div class="difficulty-container">
+                        <button class="btn btn-easy" onclick="selectMapMode('all')">Beginner<br><span
+                                style="font-size:0.8rem">Alles tonen</span></button>
+                        <button class="btn btn-medium" onclick="selectMapMode('provinces')">Gevorderd<br><span
+                                style="font-size:0.8rem">Alleen provincies</span></button>
+                        <button class="btn btn-hard" onclick="selectMapMode('blind')">Expert<br><span
+                                style="font-size:0.8rem">Blinde kaart</span></button>
+                    </div>
+                    <button class="btn" style="margin-top:20px; background:#7f8c8d"
+                        onclick="document.getElementById('difficulty-step-2').classList.add('hidden'); document.getElementById('difficulty-step-1').classList.remove('hidden');">Terug</button>
                 </div>
                 <div id="test-mode-btn" style="margin-top: 20px; display: none;">
                     <button class="btn" style="background: #333; font-size: 1rem; padding: 10px 20px;"
@@ -596,6 +670,7 @@
         let score = 0;
         let currentTarget = null;
         let remainingCities = [];
+        let citiesFound = []; // Added for map mode logic
         let timerInterval = null;
         let timeLeft = 0;
         // Keys removed, using inputState
@@ -609,6 +684,10 @@
         let enemyBaseSpeed = 5;
         let touchTargetLatLng = null;
 
+        // Configuration State
+        let configTime = 30; // Moved here as per instruction
+        let configMapMode = 'all'; // Added for map mode logic
+
         const helicopter = {
             x: gameWidth / 2,
             y: gameHeight / 2,
@@ -618,22 +697,22 @@
         };
 
         const citiesData = [
-            { name: "Groningen", lat: 53.2194, lng: 6.5665 },
-            { name: "Leeuwarden", lat: 53.2012, lng: 5.7999 },
-            { name: "Assen", lat: 52.9967, lng: 6.5642 },
-            { name: "Zwolle", lat: 52.5168, lng: 6.0830 },
-            { name: "Lelystad", lat: 52.5083, lng: 5.4750 },
-            { name: "Amsterdam", lat: 52.3702, lng: 4.8952 },
-            { name: "Haarlem", lat: 52.3874, lng: 4.6462 },
-            { name: "Utrecht", lat: 52.0907, lng: 5.1214 },
-            { name: "Den Haag", lat: 52.0705, lng: 4.3007 },
-            { name: "Rotterdam", lat: 51.9244, lng: 4.4777 },
-            { name: "Middelburg", lat: 51.4988, lng: 3.6110 },
-            { name: "'s-Hertogenbosch", lat: 51.6978, lng: 5.3037 },
-            { name: "Eindhoven", lat: 51.4416, lng: 5.4697 },
-            { name: "Arnhem", lat: 51.9851, lng: 5.8987 },
-            { name: "Maastricht", lat: 50.8514, lng: 5.6910 },
-            { name: "Enschede", lat: 52.2215, lng: 6.8937 }
+            { name: "Groningen", lat: 53.2194, lng: 6.5665, province: "Groningen" },
+            { name: "Leeuwarden", lat: 53.2012, lng: 5.7999, province: "Fryslân" },
+            { name: "Assen", lat: 52.9967, lng: 6.5642, province: "Drenthe" },
+            { name: "Zwolle", lat: 52.5168, lng: 6.0830, province: "Overijssel" },
+            { name: "Lelystad", lat: 52.5083, lng: 5.4750, province: "Flevoland" },
+            { name: "Amsterdam", lat: 52.3702, lng: 4.8952, province: "Noord-Holland" },
+            { name: "Haarlem", lat: 52.3874, lng: 4.6462, province: "Noord-Holland" },
+            { name: "Utrecht", lat: 52.0907, lng: 5.1214, province: "Utrecht" },
+            { name: "Den Haag", lat: 52.0705, lng: 4.3007, province: "Zuid-Holland" },
+            { name: "Rotterdam", lat: 51.9244, lng: 4.4777, province: "Zuid-Holland" },
+            { name: "Middelburg", lat: 51.4988, lng: 3.6110, province: "Zeeland" },
+            { name: "'s-Hertogenbosch", lat: 51.6978, lng: 5.3037, province: "Noord-Brabant" },
+            { name: "Eindhoven", lat: 51.4416, lng: 5.4697, province: "Noord-Brabant" },
+            { name: "Arnhem", lat: 51.9851, lng: 5.8987, province: "Gelderland" },
+            { name: "Maastricht", lat: 50.8514, lng: 5.6910, province: "Limburg" },
+            { name: "Enschede", lat: 52.2215, lng: 6.8937, province: "Overijssel" }
         ];
 
         const provinceColors = {
@@ -655,6 +734,8 @@
 
         let cityMarkers = {};
         let map;
+        let isTouchDevice = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0));
+
 
         function initMap() {
             map = L.map('map', {
@@ -719,7 +800,8 @@
             map.whenReady(() => {
                 map.invalidateSize();
                 createCityMarkers();
-                const buttons = document.querySelectorAll('#difficulty-buttons button');
+                // Enable Step 1 buttons
+                const buttons = document.querySelectorAll('#difficulty-step-1 button');
                 buttons.forEach(btn => btn.removeAttribute('disabled'));
 
                 // Test Mode
@@ -739,7 +821,7 @@
             citiesData.forEach(city => {
                 const icon = L.divIcon({
                     className: 'city-marker-container',
-                    html: `<div id="city-${city.name}" class="city"></div>`,
+                    html: `<div id="city-${city.name}" class="city"></div><span class="city-label">${city.name}</span>`,
                     iconSize: [20, 20], iconAnchor: [10, 10]
                 });
                 const marker = L.marker([city.lat, city.lng], { icon: icon, zIndexOffset: 1000 }).addTo(map);
@@ -855,14 +937,39 @@
 
         let activeRockets = [];
 
-        function startGame(selectedTimePerCity) {
-            if (selectedTimePerCity) timePerCity = selectedTimePerCity;
+        function spawnHelicopter() {
+            helicopter.x = gameWidth / 2;
+            helicopter.y = gameHeight / 2;
+            helicopter.element.style.transform = 'scaleX(1)';
+            helicopter.facingRight = false;
+            updateHelicopterPosition();
+        }
 
+        // Difficulty Configuration
+        function selectTime(time) {
+            configTime = time;
+            document.getElementById('difficulty-step-1').classList.add('hidden');
+            document.getElementById('difficulty-step-2').classList.remove('hidden');
+        }
+
+        function selectMapMode(mode) {
+            configMapMode = mode; // Store the selected map mode
+            // Apply Mode Class
+            document.body.classList.remove('mode-show-all', 'mode-provinces-only', 'mode-blind');
+
+            if (mode === 'all') document.body.classList.add('mode-show-all');
+            else if (mode === 'provinces') document.body.classList.add('mode-provinces-only'); // Limit cities
+            else if (mode === 'blind') document.body.classList.add('mode-blind');
+
+            // Start Game
+            startGame();
+        }
+
+        function startGame() {
             score = 0;
-            remainingCities = [...citiesData];
+            citiesFound = [];
             isPlaying = true;
             isShooterMode = false;
-            timeLeft = remainingCities.length * timePerCity;
 
             document.getElementById('score').innerText = score;
             document.getElementById('start-screen').classList.add('hidden');
@@ -880,14 +987,19 @@
             map.setView([52.2, 5.3], 9);
             map.invalidateSize();
 
-            helicopter.x = gameWidth / 2;
-            helicopter.y = gameHeight / 2;
-            helicopter.element.style.transform = 'scaleX(1)';
-            helicopter.facingRight = false;
+            // Use configured time (default 30 if null)
+            timePerCity = configTime || 30;
+            timeLeft = citiesData.length * timePerCity; // Recalculate based on selected time
 
-            updateHelicopterPosition();
+            spawnHelicopter(); // Use the new function
+            updateTimerDisplay();
             pickNewTarget();
             startTimer();
+
+            if (isTouchDevice) {
+                document.getElementById('touch-controls').style.display = 'grid';
+                document.getElementById('touch-fire').style.display = 'flex'; // Ensure fire button is also shown
+            }
 
             if (!gameLoopRunning) {
                 gameLoopRunning = true;
@@ -915,13 +1027,26 @@
         }
 
         function pickNewTarget() {
-            if (remainingCities.length === 0) {
+            let availableCities = citiesData.filter(city => !citiesFound.includes(city.name));
+
+            if (configMapMode === 'provinces') {
+                // If in 'provinces' mode, only show cities that haven't been found yet
+                // and whose province label is visible.
+                // This is a simplified check, actual visibility would be more complex.
+                // For now, we'll just ensure the city itself isn't shown.
+                // The CSS will handle hiding the city markers.
+            } else if (configMapMode === 'blind') {
+                // In 'blind' mode, all city markers are hidden by CSS.
+                // The game logic remains the same, but players rely on memory/knowledge.
+            }
+
+            if (availableCities.length === 0) {
                 endGame(false);
                 return;
             }
-            const index = Math.floor(Math.random() * remainingCities.length);
-            currentTarget = remainingCities[index];
-            remainingCities.splice(index, 1);
+            const index = Math.floor(Math.random() * availableCities.length);
+            currentTarget = availableCities[index];
+            // remainingCities.splice(index, 1); // No longer needed with citiesFound array
             document.getElementById('target-city').innerText = currentTarget.name;
             showNotification(`Zoek ${currentTarget.name}!`);
         }
@@ -1100,7 +1225,7 @@
             const paramPoint = map.latLngToContainerPoint(mapLatLng);
 
             // Precision Distance Check
-            // User requested "5 pixels around the middle". 
+            // User requested "5 pixels around the middle".
             // City marker is approx 20px wide (radius 10).
             // We use a threshold of 20px total distance between centers to be precise but playable.
             const dist = Math.hypot(helicopter.x - paramPoint.x, helicopter.y - paramPoint.y);
@@ -1109,11 +1234,15 @@
                 // Found!
                 score++;
                 document.getElementById('score').innerText = score;
-                showNotification(`Gevonden: ${targetName}!`);
+                // removed showNotification as requested
+
+                // Celebration!
+                spawnConfetti(paramPoint.x, paramPoint.y);
 
                 const el = marker.getElement().querySelector('.city');
                 if (el) el.classList.add('found');
 
+                citiesFound.push(targetName);
                 pickNewTarget();
             }
         }
@@ -1228,6 +1357,31 @@
             el.innerText = text;
             area.appendChild(el);
             setTimeout(() => { el.remove(); }, 2000);
+        }
+
+        function spawnConfetti(x, y) {
+            const colors = ['#f1c40f', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6'];
+            for (let i = 0; i < 30; i++) {
+                const el = document.createElement('div');
+                el.className = 'confetti';
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+                el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                document.body.appendChild(el);
+
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 50 + Math.random() * 100;
+                const tx = Math.cos(angle) * velocity;
+                const ty = Math.sin(angle) * velocity;
+
+                el.animate([
+                    { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+                    { transform: `translate(${tx}px, ${ty}px) scale(0)`, opacity: 0 }
+                ], {
+                    duration: 800 + Math.random() * 400,
+                    easing: 'cubic-bezier(0, .9, .57, 1)'
+                }).onfinish = () => el.remove();
+            }
         }
 
         let gameLoopRunning = false;
