@@ -62,6 +62,16 @@ No build step required! This is a standalone web application.
 
 The game is fully responsive and includes a dedicated touch interface for tablets (iPad, Android tablets). When a touch device is detected, a virtual joystick and fire button will appear on the screen.
 
+
+## 🔒 Privacy & Safety
+
+This game is designed to be **safe for kids** and **privacy-friendly**.
+
+*   **No Cookies**: The game does not set any cookies.
+*   **No Tracking**: There are no analytics, ads, or tracking scripts.
+*   **No Personal Data**: No user data is collected or stored.
+*   **External Requests**: The game loads map tiles from *CartoDB* and the map library from *unpkg* (CDNs) to function. These are standard technical dependencies solely for displaying the map.
+
 ---
 
 *Fly safe, Pilot!*
