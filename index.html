@@ -546,39 +546,25 @@
             pointer-events: none;
         }
 
+        /* Hide D-pad completely - we use joystick for all touch devices */
+        #touch-controls {
+            display: none !important;
+        }
+
         @media (pointer: coarse) {
-            /* Default: show D-pad for tablets */
-            #touch-controls {
-                display: grid;
-            }
-
-            #touch-fire {
-                display: flex;
-            }
-
-            #joystick-container {
-                display: none;
-            }
-
             #controls-hint {
                 display: none;
             }
         }
 
-        /* Phone-specific: use joystick instead of D-pad */
+        /* Phone-specific: smaller fire button */
         @media (pointer: coarse) and (max-width: 600px) {
-            #touch-controls {
-                display: none !important;
-            }
-
             #joystick-container {
-                display: block;
                 left: 30px;
                 bottom: 30px;
             }
 
             #touch-fire {
-                display: flex;
                 right: 30px;
                 left: auto;
                 bottom: 30px;
@@ -1215,8 +1201,8 @@
             startTimer();
 
             if (isTouchDevice) {
-                document.getElementById('touch-controls').style.display = 'grid';
-                document.getElementById('touch-fire').style.display = 'flex'; // Ensure fire button is also shown
+                document.getElementById('joystick-container').style.display = 'block';
+                document.getElementById('touch-fire').style.display = 'flex';
             }
 
             if (!gameLoopRunning) {
@@ -1279,6 +1265,9 @@
                 document.getElementById('end-message').innerText = "Je benzine is op.";
                 document.getElementById('final-score').innerText = score;
                 document.getElementById('end-screen').classList.remove('hidden');
+                // Hide touch controls
+                document.getElementById('joystick-container').style.display = 'none';
+                document.getElementById('touch-fire').style.display = 'none';
             } else {
                 // Direct transition to Shooter Mode
                 startShooterGame();
@@ -1313,6 +1302,12 @@
             document.getElementById('map').classList.add('fade-out');
             document.getElementById('ui-layer').style.opacity = 0;
             document.getElementById('shooter-score-display').style.display = 'block';
+
+            // Show touch controls for shooter mode
+            if (isTouchDevice) {
+                document.getElementById('joystick-container').style.display = 'block';
+                document.getElementById('touch-fire').style.display = 'flex';
+            }
 
             // Move Heli to Battle Station
             helicopter.element.classList.add('shooter-mode');
@@ -1418,6 +1413,9 @@
             document.getElementById('end-message').innerText = reason;
             document.getElementById('final-score').innerText = enemiesDefeatedCount + " Punten";
             document.getElementById('end-screen').classList.remove('hidden');
+            // Hide touch controls
+            document.getElementById('joystick-container').style.display = 'none';
+            document.getElementById('touch-fire').style.display = 'none';
         }
 
         function createExplosion(x, y) {
