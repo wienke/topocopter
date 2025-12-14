@@ -684,10 +684,11 @@
             <!-- Screens -->
             <div id="start-screen" class="overlay">
                 <!-- Intro Video -->
-                <div style="width: 40vh; height: 40vh; border-radius: 30px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; position: relative;">
+                <div id="video-container" style="width: 40vh; height: 40vh; border-radius: 30px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; position: relative;">
                     <video id="intro-video" autoplay muted loop playsinline style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); height: 100%; width: auto;">
                         <source src="intro_video.mp4" type="video/mp4">
                     </video>
+                    <button id="play-btn" onclick="playVideo()" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); border: none; border-radius: 50%; width: 70px; height: 70px; cursor: pointer; font-size: 30px; display: none; align-items: center; justify-content: center; color: white;">▶</button>
                     <button id="mute-btn" onclick="toggleMute()" style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center;">🔇</button>
                 </div>
                 <!-- Step 1: Time Selection -->
@@ -1120,6 +1121,32 @@
             helicopter.facingRight = false;
             updateHelicopterPosition();
         }
+
+        // Play video (for mobile devices where autoplay doesn't work)
+        function playVideo() {
+            const video = document.getElementById('intro-video');
+            const playBtn = document.getElementById('play-btn');
+            video.play();
+            playBtn.style.display = 'none';
+        }
+
+        // Check if autoplay worked, if not show play button
+        const introVideo = document.getElementById('intro-video');
+        const playBtn = document.getElementById('play-btn');
+        
+        // Try to detect autoplay failure
+        introVideo.play().then(() => {
+            // Autoplay worked, hide play button
+            playBtn.style.display = 'none';
+        }).catch(() => {
+            // Autoplay failed, show play button
+            playBtn.style.display = 'flex';
+        });
+
+        // Also listen for play event to hide button
+        introVideo.addEventListener('play', () => {
+            playBtn.style.display = 'none';
+        });
 
         // Mute/Unmute toggle for intro video
         function toggleMute() {
