@@ -512,7 +512,42 @@
             transform: scale(0.95);
         }
 
+        /* Joystick styles */
+        #joystick-container {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 1000;
+            display: none;
+        }
+
+        #joystick-base {
+            width: 120px;
+            height: 120px;
+            background: rgba(44, 62, 80, 0.5);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            position: relative;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        #joystick-stick {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+        }
+
         @media (pointer: coarse) {
+            /* Default: show D-pad for tablets */
             #touch-controls {
                 display: grid;
             }
@@ -521,8 +556,38 @@
                 display: flex;
             }
 
+            #joystick-container {
+                display: none;
+            }
+
             #controls-hint {
                 display: none;
+            }
+        }
+
+        /* Phone-specific: use joystick instead of D-pad */
+        @media (pointer: coarse) and (max-width: 600px) {
+            #touch-controls {
+                display: none !important;
+            }
+
+            #joystick-container {
+                display: block;
+                left: 30px;
+                bottom: 30px;
+            }
+
+            #touch-fire {
+                display: flex;
+                right: 30px;
+                left: auto;
+                bottom: 30px;
+            }
+
+            .control-btn.big {
+                width: 80px;
+                height: 80px;
+                font-size: 1.5rem;
             }
         }
 
@@ -597,14 +662,21 @@
             <div id="helicopter"><span id="heli-sprite">🚁</span></div>
             <div id="notification-area"></div>
 
-            <!-- Touch Controls -->
-            <!-- Touch Controls -->
+            <!-- Touch Controls (D-pad for tablets) -->
             <div id="touch-controls">
                 <button id="btn-up" class="control-btn">▲</button>
                 <button id="btn-left" class="control-btn">◀</button>
                 <button id="btn-right" class="control-btn">▶</button>
                 <button id="btn-down" class="control-btn">▼</button>
             </div>
+            
+            <!-- Virtual Joystick (for phones) -->
+            <div id="joystick-container">
+                <div id="joystick-base">
+                    <div id="joystick-stick"></div>
+                </div>
+            </div>
+            
             <div id="touch-fire">
                 <button id="btn-fire" class="control-btn big">🔥</button>
             </div>
@@ -923,6 +995,87 @@
         const fEnd = (e) => { e.preventDefault(); fireBtn.style.background = 'rgba(231, 76, 60, 0.6)'; };
         fireBtn.addEventListener('touchstart', fStart); fireBtn.addEventListener('touchend', fEnd);
         fireBtn.addEventListener('mousedown', fStart); fireBtn.addEventListener('mouseup', fEnd);
+
+        // Virtual Joystick Setup
+        const joystickBase = document.getElementById('joystick-base');
+        const joystickStick = document.getElementById('joystick-stick');
+        let joystickActive = false;
+        let joystickCenterX = 0;
+        let joystickCenterY = 0;
+        const joystickMaxDistance = 35;
+        const joystickDeadzone = 10;
+
+        function updateJoystickInput(deltaX, deltaY) {
+            // Reset all directions first
+            inputState.up = false;
+            inputState.down = false;
+            inputState.left = false;
+            inputState.right = false;
+
+            // Apply directions based on joystick position
+            if (Math.abs(deltaX) > joystickDeadzone || Math.abs(deltaY) > joystickDeadzone) {
+                if (deltaX < -joystickDeadzone) inputState.left = true;
+                if (deltaX > joystickDeadzone) inputState.right = true;
+                if (deltaY < -joystickDeadzone) inputState.up = true;
+                if (deltaY > joystickDeadzone) inputState.down = true;
+            }
+        }
+
+        function handleJoystickMove(clientX, clientY) {
+            const rect = joystickBase.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            let deltaX = clientX - centerX;
+            let deltaY = clientY - centerY;
+
+            // Limit to max distance
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            if (distance > joystickMaxDistance) {
+                deltaX = (deltaX / distance) * joystickMaxDistance;
+                deltaY = (deltaY / distance) * joystickMaxDistance;
+            }
+
+            // Move the stick visually
+            joystickStick.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+
+            // Update input state
+            updateJoystickInput(deltaX, deltaY);
+        }
+
+        function resetJoystick() {
+            joystickActive = false;
+            joystickStick.style.transform = 'translate(-50%, -50%)';
+            inputState.up = false;
+            inputState.down = false;
+            inputState.left = false;
+            inputState.right = false;
+        }
+
+        joystickBase.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            joystickActive = true;
+            const touch = e.touches[0];
+            handleJoystickMove(touch.clientX, touch.clientY);
+        });
+
+        joystickBase.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (joystickActive) {
+                const touch = e.touches[0];
+                handleJoystickMove(touch.clientX, touch.clientY);
+            }
+        });
+
+        joystickBase.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            resetJoystick();
+        });
+
+        joystickBase.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            resetJoystick();
+        });
 
         function fireRocket(projectileEmoji = '🚀') {
             const container = document.getElementById('game-container');
