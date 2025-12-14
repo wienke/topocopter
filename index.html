@@ -577,6 +577,39 @@
             }
         }
 
+        /* Phone portrait mode: compact UI */
+        @media (max-width: 500px) and (orientation: portrait) {
+            #ui-layer {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                gap: 5px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .ui-box {
+                padding: 8px 12px;
+                font-size: 0.85rem;
+                border-radius: 8px;
+                gap: 5px;
+            }
+
+            .ui-label {
+                font-size: 0.65rem;
+                letter-spacing: 0.5px;
+                margin-right: 3px;
+            }
+
+            #target-city {
+                font-size: 0.95rem;
+            }
+
+            #timer {
+                font-size: 1rem;
+            }
+        }
+
         #controls-hint {
             position: absolute;
             bottom: 30px;
