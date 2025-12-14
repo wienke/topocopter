@@ -453,7 +453,7 @@
         #touch-fire {
             position: absolute;
             bottom: 50px;
-            left: 50px;
+            right: 50px;
             padding-bottom: env(safe-area-inset-bottom);
             z-index: 1000;
             display: none;
@@ -557,7 +557,7 @@
             }
         }
 
-        /* Phone-specific: smaller fire button */
+        /* Phone-specific: adjust positions and sizes */
         @media (pointer: coarse) and (max-width: 600px) {
             #joystick-container {
                 left: 30px;
@@ -566,7 +566,6 @@
 
             #touch-fire {
                 right: 30px;
-                left: auto;
                 bottom: 30px;
             }
 
