@@ -1002,6 +1002,13 @@
             isPlaying = true;
             isShooterMode = false;
 
+            // Stop intro video
+            const introVideo = document.getElementById('intro-video');
+            if (introVideo) {
+                introVideo.pause();
+                introVideo.currentTime = 0;
+            }
+
             document.getElementById('score').innerText = score;
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('end-screen').classList.add('hidden');
@@ -1105,6 +1112,13 @@
             document.getElementById('end-screen').classList.add('hidden');
             isShooterMode = true;
             isPlaying = true;
+
+            // Stop intro video
+            const introVideo = document.getElementById('intro-video');
+            if (introVideo) {
+                introVideo.pause();
+                introVideo.currentTime = 0;
+            }
 
             // Reset Shooter State
             activeRockets = [];
